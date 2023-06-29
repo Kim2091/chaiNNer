@@ -21,7 +21,12 @@ from chain.cache import OutputCache
 from chain.json import JsonNode, parse_json
 from chain.optimize import optimize
 from custom_types import UpdateProgressFn
-from dependencies.store import DependencyInfo, install_dependencies, installed_packages
+from dependencies.store import (
+    DependencyInfo,
+    install_dependencies,
+    installed_packages,
+    uninstall_dependencies,
+)
 from events import EventQueue, ExecutionErrorData
 from nodes.group import Group
 from nodes.utils.exec_options import (
@@ -612,6 +617,48 @@ async def install_dependencies_req(request: Request):
         logger.error(exception, exc_info=True)
         return json(
             errorResponse("Error installing dependencies!", exception), status=500
+        )
+
+
+@app.route("/dependencies/uninstall", methods=["POST"])
+async def uninstall_dependencies_req(request: Request):
+    await nodes_available()
+    pip_queue = AppContext.get(request.app).pip_queue
+
+    async def update_progress(
+        message: str, progress: float, status_progress: Union[float, None] = None
+    ):
+        await pip_queue.put_and_wait(
+            {
+                "event": "install-status",
+                "data": {
+                    "message": message,
+                    "progress": progress,
+                    "statusProgress": status_progress,
+                },
+            },
+            timeout=1,
+        )
+
+    try:
+        deps: List[DependencyInfo] = [
+            {
+                "package_name": dep["pypiName"],
+                "display_name": dep["displayName"],
+                "version": dep["version"],
+                "from_file": None,
+            }
+            for dep in request.json
+        ]
+        logger.info(f"Uninstalling dependencies: {deps}")
+        await uninstall_dependencies(deps, update_progress, logger)
+        return json(
+            successResponse("Successfully uninstalled dependencies!"), status=200
+        )
+    except Exception as exception:
+        logger.error(exception, exc_info=True)
+        return json(
+            errorResponse("Error uninstalling dependencies!", exception), status=500
         )
 
 

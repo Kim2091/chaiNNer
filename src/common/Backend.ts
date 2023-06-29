@@ -222,6 +222,10 @@ export class Backend {
     installDependencies(deps: PyPiPackage[]): Promise<BackendResult<null>> {
         return this.fetchJson('/dependencies/install', 'POST', deps);
     }
+
+    uninstallDependencies(deps: PyPiPackage[]): Promise<BackendResult<null>> {
+        return this.fetchJson('/dependencies/uninstall', 'POST', deps);
+    }
 }
 
 const backendCache = new Map<number, Backend>();

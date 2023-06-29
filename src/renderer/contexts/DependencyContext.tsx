@@ -318,7 +318,7 @@ export const DependencyProvider = memo(({ children }: React.PropsWithChildren<un
             }
             const { message, progress: totalProgress, statusProgress } = data;
             appendToOutput(`${message}\n`);
-            setProgress(totalProgress * 100);
+            setProgress((statusProgress ?? 0) * 100);
             if (totalProgress === 1) {
                 setIsRunningShell(false);
                 setRefreshDepListTrigger(!refreshDepListTrigger);
@@ -330,40 +330,20 @@ export const DependencyProvider = memo(({ children }: React.PropsWithChildren<un
         }
     });
 
-    const changePackages = (supplier: () => Promise<void>) => {
-        if (isRunningShell) throw new Error('Cannot run two pip commands at once');
-
-        setShellOutput('');
-        setIsRunningShell(true);
-        setProgress(0);
-
-        supplier()
-            .catch((error) => {
-                appendToOutput(`${String(error)}\n`);
-            })
-            .finally(() => {
-                setIsRunningShell(false);
-                setRefreshDepListTrigger(!refreshDepListTrigger);
-                setInstallingPackage(null);
-                setUninstallingPackage(null);
-                setProgress(0);
-                restart().catch(log.error);
-            });
-    };
-
     const installPackage = (dep: Package) => {
         setInstallingPackage(dep);
-        backend.installDependencies(dep.dependencies);
-        // changePackages(() =>
-        //     runPipInstall(pythonInfo, [dep], usePipDirectly ? undefined : setProgress, onStdio)
-        // );
+        setIsRunningShell(true);
+        backend.installDependencies(dep.dependencies).catch((error) => {
+            appendToOutput(`${String(error)}\n`);
+        });
     };
 
     const uninstallPackage = (dep: Package) => {
         setUninstallingPackage(dep);
-        // changePackages(() =>
-        //     runPipUninstall(pythonInfo, [dep], usePipDirectly ? undefined : setProgress, onStdio)
-        // );
+        setIsRunningShell(true);
+        backend.uninstallDependencies(dep.dependencies).catch((error) => {
+            appendToOutput(`${String(error)}\n`);
+        });
     };
 
     useEffect(() => {
